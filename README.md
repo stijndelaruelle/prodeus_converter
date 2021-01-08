@@ -30,7 +30,7 @@ But as custom textures currently can't be uploaded to the workshop, this can be 
   - Note that with a very large model this can take a couple of seconds.
 - Load up the Prodeus Level Editor & add the prefab to your level!
 
-![Image of the Prodeus Model Converter](https://github.com/stijndelaruelle/prodeus_converter/Prodeus_Converter_Mini_Tutorial.png)
+![Image of the Prodeus Model Converter](https://raw.githubusercontent.com/stijndelaruelle/prodeus_converter/main/Prodeus_Converter_Mini_Tutorial.png)
 
 ## Disclaimer
 
