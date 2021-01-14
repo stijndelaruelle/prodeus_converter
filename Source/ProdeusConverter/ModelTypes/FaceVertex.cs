@@ -103,22 +103,32 @@ namespace ProdeusConverter
             return true;
         }
 
-        public string SerializeOBJ()
+        public bool DeserializeEMAP(int vertexIndex, int textureCoordinateIndex)
+        {
+            //Due to the setup of EMAP it has already been cut up in the Face itself
+            m_VertexIndex = vertexIndex;
+            m_TextureCoordinateIndex = textureCoordinateIndex;
+            m_NormalIndex = -1; //Normals not included in EMAP
+
+            return true;
+        }
+
+        public string SerializeOBJ(int vertexIndexOffset, int textureCoordinateIndexOffset, int normalIndexOffset)
         {
             //Temp
             if (m_VertexIndex < 0)
                 return "invalid FaceVertex";
 
-            StringBuilder stringBuilder = new StringBuilder("" + m_VertexIndex);
+            StringBuilder stringBuilder = new StringBuilder("" + (m_VertexIndex + 1 + vertexIndexOffset)); //OBJ is 1 based & uses offsets between objects!
 
             if (m_TextureCoordinateIndex >= 0 || m_NormalIndex >= 0) //If there is no texCoord but there is a normal it displays v//vn
                 stringBuilder.Append("/");
 
             if (m_TextureCoordinateIndex >= 0)
-                stringBuilder.Append(m_TextureCoordinateIndex);
+                stringBuilder.Append(m_TextureCoordinateIndex + 1 + textureCoordinateIndexOffset);
 
             if (m_NormalIndex >= 0)
-                stringBuilder.Append("/" + m_NormalIndex);
+                stringBuilder.Append("/" + (m_NormalIndex + 1 + normalIndexOffset));
 
             return stringBuilder.ToString();
         }
@@ -126,7 +136,7 @@ namespace ProdeusConverter
         //Overrides
         public override string ToString()
         {
-            return SerializeOBJ();
+            return SerializeOBJ(0, 0, 0);
         }
     }
 }

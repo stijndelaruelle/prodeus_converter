@@ -1,6 +1,7 @@
 ﻿using System.IO;
 using System.Text;
 using System.Collections.Generic;
+using System;
 
 namespace ProdeusConverter
 {
@@ -32,7 +33,28 @@ namespace ProdeusConverter
         }
 
         //Serialization
-        public bool DeserializeOBJ(string filePath)
+        public bool Deserialize(string filePath)
+        {
+            string inputFileType = Path.GetExtension(filePath);
+            bool success = true;
+
+            switch (inputFileType)
+            {
+                case ".obj":  { success = DeserializeOBJ(filePath); break; }
+                case ".emap": { success = DeserializeEMAP(filePath); break; }
+
+                default:
+                {
+                    Logger.LogMessage(Logger.LogType.Warning, "Unable to read input filetype. Please select an .obj or .emap file");
+                    success = false;
+                    break;
+                }
+            }
+
+            return success;
+        }
+
+        private bool DeserializeOBJ(string filePath)
         {
             ModelObject currentModelObject = null;
 
@@ -49,7 +71,7 @@ namespace ProdeusConverter
             while (currentLine != null)
             {
                 //Create object when encountering an o
-                if (currentLine.StartsWith("o"))
+                if (currentLine.StartsWith("o "))
                 {
                     //Add in the current object
                     if (currentModelObject != null && currentModelObject.IsEmpty() == false)
@@ -75,7 +97,7 @@ namespace ProdeusConverter
                         currentModelObject = new ModelObject("Default Object");
                     }
 
-                    bool success = currentModelObject.DeserializePart(currentLine, vertexIndexOffset, textureCoordinateIndexOffset, normalIndexOffset);
+                    bool success = currentModelObject.DeserializeOBJPart(currentLine, vertexIndexOffset, textureCoordinateIndexOffset, normalIndexOffset);
 
                     if (success == false)
                     {
@@ -103,21 +125,175 @@ namespace ProdeusConverter
             return true;
         }
 
-        public string SerializeOBJ()
+        private bool DeserializeEMAP(string filePath)
         {
-            //Temp
-            StringBuilder stringBuilder = new StringBuilder();
-            stringBuilder.AppendLine("# Converted from " + m_OriginalFilePath);
+            //Read the file
+            StreamReader streamReader = new StreamReader(filePath);
+            string fileContent = streamReader.ReadToEnd();
+            
+            streamReader.Close();
 
-            foreach (ModelObject modelObject in m_ModelObjects)
+            //Very basic check to see if it's a Prodeus file? Easily bypassed of course, but why would you?
+            //Note: We really assume here that the file has been constructed by the game itself. If not this will all fail horribly.
+            if (fileContent.StartsWith("Version_1") == false)
             {
-                stringBuilder.AppendLine(modelObject.SerializeOBJ());
+                Logger.LogMessage(Logger.LogType.Error, "Couldn't write to existing output file, this file was most likely not saved by Prodeus itself.");
+                return false;
             }
 
-            return stringBuilder.ToString();
+            int breaklineLength = 0;
+            if (fileContent.Contains("\r\n"))    { breaklineLength = 2; }
+            else if (fileContent.Contains("\n")) { breaklineLength = 1; }
+            else
+            {
+                Logger.LogMessage(Logger.LogType.Error, "File is using unconventional line endings!");
+                return false;
+            }
+
+            //---------------------------
+            // Get the "Brushes" block
+            //---------------------------
+
+            //Determine start point
+            string brushHeader = "Brushes{";
+            int brushesStartIndex = fileContent.IndexOf(brushHeader);
+            if (brushesStartIndex < 0)
+            {
+                Logger.LogMessage(Logger.LogType.Error, "Couldn't write to existing output file, this file was most likely not saved by Prodeus itself.");
+                return false;
+            }
+
+            //Determine end point of brushes (Brushes are always above Nodes when Prodeus exports the file)
+            int nodeStartIndex = fileContent.IndexOf("Nodes{");
+            if (nodeStartIndex < 0)
+            {
+                Logger.LogMessage(Logger.LogType.Error, "Couldn't write to existing output file, this file was most likely not saved by Prodeus itself.");
+                return false;
+            }
+
+            int brushesEndIndex = nodeStartIndex - breaklineLength; //breakline
+            string brushesContent = fileContent.Substring(brushesStartIndex, brushesEndIndex - brushesStartIndex);
+
+            //---------------------------
+            // Loop trough all brushes
+            //---------------------------
+            int brushstartIndex = brushesContent.IndexOf("Brush{");
+            bool isLooping = true;
+
+            while (isLooping)
+            {
+                int brushEndIndex = brushesContent.IndexOf("Brush{", brushstartIndex + 1);
+                if (brushEndIndex < 0)
+                {
+                    brushEndIndex = brushesContent.Length - 1; // }
+                    isLooping = false;
+                }
+
+                int tempBrushEndIndex = brushEndIndex - breaklineLength; //Remove the breakline as well
+
+                string brushContent = brushesContent.Substring(brushstartIndex, tempBrushEndIndex - brushstartIndex);
+
+                ModelObject newModelObject = new ModelObject("New Brush"); //Temp
+                bool success = newModelObject.DeserializeEMAP(brushContent, breaklineLength);
+
+                //Exit out if a brush couldn't be parsed properly
+                if (success == false)
+                    return false;
+
+                m_ModelObjects.Add(newModelObject);
+
+                brushstartIndex = brushEndIndex; //Use this for the next iteration
+            }
+
+            m_Name = Path.GetFileNameWithoutExtension(filePath);
+            m_OriginalFilePath = filePath;
+
+            return true;
         }
 
-        public void SerializeEMAP(string filePath, SerializeMode serializeMode)
+        public bool Serialize(string filePath, SerializeMode serializeMode)
+        {
+            string inputFileType = Path.GetExtension(filePath);
+            bool success = true;
+
+            switch (inputFileType)
+            {
+                case ".obj": { SerializeOBJ(filePath, serializeMode); break; }
+                case ".emap": { SerializeEMAP(filePath, serializeMode); break; }
+
+                default:
+                    {
+                        Logger.LogMessage(Logger.LogType.Warning, "Unable to read output filetype. Please select an .obj or .emap file");
+                        success = false;
+                        break;
+                    }
+            }
+
+            return success;
+        }
+
+        private void SerializeOBJ(string filePath, SerializeMode serializeMode)
+        {
+            string fileString = string.Empty;
+
+            //Write
+            bool isNewFile = !File.Exists(filePath);
+
+            //---------------
+            // Existing file
+            //---------------
+            if (isNewFile == true || serializeMode == SerializeMode.Overwrite)
+            {
+                string brushString = SerializeOBJBrushes(0, 0, 0);
+
+                StringBuilder fileStringBuilder = new StringBuilder();
+                fileStringBuilder.AppendLine("# Converted from " + m_OriginalFilePath);
+                fileStringBuilder.Append(brushString);
+
+                fileString = fileStringBuilder.ToString();
+            }
+            else if (isNewFile == false && serializeMode == SerializeMode.Append)
+            {
+                //Open the existing file and count the amount of vertices, texture coordinates & normals
+                int vertexIndexOffset = 0;
+                int textureCoordinateIndexOffset = 0;
+                int normalIndexOffset = 0;
+
+                //Open the file
+                StreamReader streamReader = new StreamReader(filePath);
+                StringBuilder fileStringBuilder = new StringBuilder();
+
+                //Read the file line by line
+                string currentLine = streamReader.ReadLine(); //works for \n and \rn I assume
+                while (currentLine != null)
+                {
+                    if (currentLine.StartsWith("v "))  { vertexIndexOffset += 1; }
+                    if (currentLine.StartsWith("vt ")) { textureCoordinateIndexOffset += 1; }
+                    if (currentLine.StartsWith("vn ")) { normalIndexOffset += 1; }
+
+                    fileStringBuilder.AppendLine(currentLine);
+
+                    currentLine = streamReader.ReadLine();
+                }
+
+                //Close the file
+                streamReader.Close();
+
+                string brushString = SerializeOBJBrushes(vertexIndexOffset, textureCoordinateIndexOffset, normalIndexOffset);
+
+                fileStringBuilder.AppendLine("# Converted from " + m_OriginalFilePath);
+                fileStringBuilder.Append(brushString);
+
+                fileString = fileStringBuilder.ToString();
+            }
+
+            //Actually Write it to a file
+            StreamWriter streamWriter = new StreamWriter(filePath);
+            streamWriter.Write(fileString);
+            streamWriter.Close();
+        }
+
+        private void SerializeEMAP(string filePath, SerializeMode serializeMode)
         {
             StringBuilder brushStringBuilder = new StringBuilder();
 
@@ -144,6 +320,15 @@ namespace ProdeusConverter
                 string fileContent = streamReader.ReadToEnd();
                 streamReader.Close();
 
+                int breaklineLength = 0;
+                if (fileContent.Contains("\r\n")) { breaklineLength = 2; }
+                else if (fileContent.Contains("\n")) { breaklineLength = 1; }
+                else
+                {
+                    Logger.LogMessage(Logger.LogType.Error, "File is using unconventional line endings!");
+                    return;
+                }
+
                 //Very basic check to see if it's a Prodeus file? Easily bypassed of course, but why would you?
                 //Note: We really assume here that the file has been constructed by the game itself. If not this will all fail horribly.
                 if (fileContent.StartsWith("Version_1") == false)
@@ -160,7 +345,7 @@ namespace ProdeusConverter
                     return;
                 }
 
-                int brushesEndIndex = nodeStartIndex - 2; //breakline and }
+                int brushesEndIndex = nodeStartIndex - breaklineLength; //breakline
 
                 string preNewBrushString = string.Empty;
                 string postNewBrushString = fileContent.Substring(brushesEndIndex - 1, fileContent.Length - brushesEndIndex);
@@ -255,9 +440,26 @@ namespace ProdeusConverter
         }
 
         //Overrides
+        private string SerializeOBJBrushes(int vertexIndexOffset, int textureCoordinateIndexOffset, int normalIndexOffset)
+        {
+            StringBuilder brushStringBuilder = new StringBuilder();
+
+            //Convert
+            foreach (ModelObject modelObject in m_ModelObjects)
+            {
+                brushStringBuilder.Append(modelObject.SerializeOBJ(vertexIndexOffset, textureCoordinateIndexOffset, normalIndexOffset));
+
+                vertexIndexOffset            += modelObject.GetVertexCount();
+                textureCoordinateIndexOffset += modelObject.GetTextureCoordinateCount();
+                normalIndexOffset            += modelObject.GetNormalCount();
+            }
+
+            return brushStringBuilder.ToString();
+        }
+
         public override string ToString()
         {
-            return SerializeOBJ();
+            return SerializeOBJBrushes(0, 0, 0);
         }
     }
 }

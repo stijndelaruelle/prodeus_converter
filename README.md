@@ -2,7 +2,7 @@
 
 ## Introduction
 
-This is a small tool than converts 3D models from the Wavefront (.obj) format to Prodeus maps (.emap).
+This is a small tool that can convert 3D models in the Wavefront (.obj) format to and from Prodeus maps (.emap).
 
 It takes into account all the essential data like vertices, edges, texture coordinates (UV's) & faces.<br/>
 But skips out on data like materials, smoothing groups etc.. These can all be edited in the Prodeus Level Editor itself.
@@ -22,13 +22,13 @@ But as custom textures currently can't be uploaded to the workshop, this can be 
 ## How to use?
 
 - Download the latest version from the Builds folder above
-- Select an .obj file in the top textbox
+- Select an .obj or .emap file in the top textbox
   - Creating an .obj can be done with almost all 3D modelling software (Blender, 3D Max, Maya, etc...)
-- Select a destination for the .emap file in the bottom textbox
+- Select a destination for the .obj or .emap file in the bottom textbox
   - Prodeus saves it's prefabs in C:\Users\Username\AppData\LocalLow\BoundingBoxSoftware\Prodeus\LocalData\RefMaps
 - Convert!
   - Note that with a very large model this can take a couple of seconds.
-- Load up the Prodeus Level Editor & add the prefab to your level!
+- Load up your favourite 3D program or the Prodeus Level Editor & open it!
 
 ![Image of the Prodeus Model Converter](https://raw.githubusercontent.com/stijndelaruelle/prodeus_converter/main/Prodeus_Converter_Mini_Tutorial.png)
 

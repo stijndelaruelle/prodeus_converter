@@ -82,14 +82,121 @@ namespace ProdeusConverter
             return true;
         }
 
-        public string SerializeOBJ()
+        public bool DeserializeEMAP(ModelObject modelObject, string data, int breaklineLength)
+        {
+            if (modelObject == null)
+                return false;
+
+            List<int> indices = new List<int>();
+            List<int> uvs = new List<int>();
+
+            //----------------------------
+            // Indices (Vertex Index)
+            //----------------------------
+            string indiceListName = "points=";
+
+            //Indice start index
+            int vertexListStartIndex = data.IndexOf(indiceListName);
+            vertexListStartIndex += indiceListName.Length;
+
+            //Find indice end index (first breakline character)
+            int vertexListEndIndex = 0;
+            for (int i = vertexListStartIndex; i < data.Length; ++i)
+            {
+                if (data[i] == '\n' || data[i] == '\r')
+                {
+                    vertexListEndIndex = i;
+                    break;
+                }
+            }
+
+            //Split into indiceStrings
+            string indiceListString = data.Substring(vertexListStartIndex, vertexListEndIndex - vertexListStartIndex);
+            string[] indiceStrings = indiceListString.Split(';');
+
+            //Loop trough them and finally deserialize
+            for (int i = 0; i < indiceStrings.Length; ++i)
+            {
+                int indiceIndex = 0;
+                bool success = int.TryParse(indiceStrings[i], out indiceIndex);
+                if (success == false)
+                {
+                    Logger.LogMessage(Logger.LogType.Error, "Trying to Parse invalid Face (vertex index is not an integer)");
+                    return false;
+                }
+
+                indices.Add(indiceIndex);
+            }
+
+            //----------------------------
+            // UVS
+            //----------------------------
+            string uvsListName = "uvs=";
+
+            //UV start index
+            int uvListStartIndex = data.IndexOf(uvsListName);
+            uvListStartIndex += uvsListName.Length;
+
+            //Find uv end index (first breakline character)
+            int uvListEndIndex = 0;
+            for (int i = uvListStartIndex; i < data.Length; ++i)
+            {
+                if (data[i] == '\n' || data[i] == '\r')
+                {
+                    uvListEndIndex = i;
+                    break;
+                }
+            }
+
+            //Split into uvStrings
+            string uvsListString = data.Substring(uvListStartIndex, uvListEndIndex - uvListStartIndex);
+            string[] uvStrings = uvsListString.Split(';');
+
+            //Loop trough them and finally deserialize
+            for (int i = 0; i < uvStrings.Length; ++i)
+            {
+                TextureCoordinate newTextureCoordinate = new TextureCoordinate();
+                bool success = newTextureCoordinate.Deserialize(uvStrings[i], ',');
+
+                if (success == false)
+                    return false;
+
+                //As they are stored in the ModelObject, we need to send them there and use their index here
+                int textureCoordinateIndex = modelObject.GetOrAddTextureCoordinate(newTextureCoordinate);
+                uvs.Add(textureCoordinateIndex);
+            }
+
+            //----------------------------
+            // Create FaceVertices
+            //----------------------------
+            if (indices.Count != uvs.Count)
+            {
+                Logger.LogMessage(Logger.LogType.Error, "Face has different amount of indices & uvs");
+                return false;
+            }
+
+            for (int i = 0; i < indices.Count; ++i)
+            {
+                FaceVertex newFaceVertex = new FaceVertex();
+                bool success =  newFaceVertex.DeserializeEMAP(indices[i], uvs[i]);
+
+                if (success == false)
+                    return false;
+
+                m_FaceVertices.Add(newFaceVertex);
+            }
+
+            return true;
+        }
+
+        public string SerializeOBJ(int vertexIndexOffset, int textureCoordinateIndexOffset, int normalIndexOffset)
         {
             //Temp
             StringBuilder stringBuilder = new StringBuilder("f");
 
             foreach (FaceVertex faceVertex in m_FaceVertices)
             {
-                stringBuilder.Append(" " + faceVertex.SerializeOBJ());
+                stringBuilder.Append(" " + faceVertex.SerializeOBJ(vertexIndexOffset, textureCoordinateIndexOffset, normalIndexOffset));
             }
 
             return stringBuilder.ToString();
@@ -153,7 +260,7 @@ namespace ProdeusConverter
         //Overrides
         public override string ToString()
         {
-            return SerializeOBJ();
+            return SerializeOBJ(0, 0, 0);
         }
     }
 }

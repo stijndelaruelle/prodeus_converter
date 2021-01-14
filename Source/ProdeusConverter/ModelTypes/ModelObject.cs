@@ -12,6 +12,7 @@ namespace ProdeusConverter
     public class ModelObject
     {
         private string m_Name = string.Empty;
+        private Vector3f m_Position = null;
         private List<Vertex> m_Vertices = null;
         private List<TextureCoordinate> m_TextureCoordinates = null;
         private List<Normal> m_Normals = null;
@@ -88,8 +89,21 @@ namespace ProdeusConverter
             }
         }
 
+        public int GetOrAddTextureCoordinate(TextureCoordinate textureCoordinate)
+        {
+            int index = m_TextureCoordinates.IndexOf(textureCoordinate);
+
+            if (index < 0)
+            {
+                m_TextureCoordinates.Add(textureCoordinate);
+                return m_TextureCoordinates.Count - 1;
+            }
+
+            return index;
+        }
+
         //Serialization
-        public bool DeserializePart(string data, int vertexIndexOffset, int textureCoordinateIndexOffset, int normalIndexOffset)
+        public bool DeserializeOBJPart(string data, int vertexIndexOffset, int textureCoordinateIndexOffset, int normalIndexOffset)
         {
             //NOTE: We are only parsing a very small selection of OBJ features!
             //Full list of features: https://en.wikipedia.org/wiki/Wavefront_.obj_file
@@ -151,7 +165,111 @@ namespace ProdeusConverter
             return true;
         }
 
-        public string SerializeOBJ()
+        public bool DeserializeEMAP(string data, int breaklineLength)
+        {
+            //Find the position (vertex offset)
+            string posName = "pos=";
+            int posStartIndex = data.IndexOf(posName);
+            posStartIndex += posName.Length;
+
+            //Find position end index (first breakline character)
+            int posEndIndex = 0;
+            for (int i = posStartIndex; i < data.Length; ++i)
+            {
+                if (data[i] == '\n' || data[i] == '\r')
+                {
+                    posEndIndex = i;
+                    break;
+                }
+            }
+
+            string posString = data.Substring(posStartIndex, posEndIndex - posStartIndex);
+            m_Position = new Vector3f();
+            bool success = m_Position.Deserialize(posString, ',');
+
+            if (success == false)
+                return false;
+
+            //Find vertexlist
+            string vertexListName = "points=";
+            int vertexListStartIndex = data.IndexOf(vertexListName);
+            vertexListStartIndex += vertexListName.Length;
+
+            //Find first face
+            int faceStartIndex = data.IndexOf("Face{");
+
+            //If points is ahead of first face, we are in the clear. (face also uses "points" for indices)
+            if (vertexListStartIndex < 0 || faceStartIndex < 0 || faceStartIndex < vertexListStartIndex )
+            {
+                Logger.LogMessage(Logger.LogType.Error, "Couldn't load brush, either no vertices or no faces found.");
+                return false;
+            }
+
+            //Load the vertices
+            
+            //Find vertex end index (first breakline character)
+            int vertexListEndIndex = 0;
+            for (int i = vertexListStartIndex; i < data.Length; ++i)
+            {
+                if (data[i] == '\n' || data[i] == '\r')
+                {
+                    vertexListEndIndex = i;
+                    break;
+                }
+            }
+
+            //Split into vertexStrings
+            string vertexListString = data.Substring(vertexListStartIndex, vertexListEndIndex - vertexListStartIndex);
+            string[] vertexStrings = vertexListString.Split(';');
+
+            //Loop trough them and finally deserialize
+            for (int i = 0; i < vertexStrings.Length; ++i)
+            {
+                Vector4f newVertex = new Vector4f();
+                success = newVertex.Deserialize(vertexStrings[i], ',');
+
+                if (success == false)
+                    return false;
+
+                m_Vertices.Add(newVertex);
+            }
+
+            //Normals & UV's not declared in this part, but in the faces
+
+            //Loop trough all faces
+            bool isLooping = true;
+
+            while (isLooping)
+            {
+                int faceEndIndex = data.IndexOf("Face{", faceStartIndex + 1);
+                if (faceEndIndex < 0)
+                {
+                    faceEndIndex = data.Length - 1; // }
+                    isLooping = false;
+                }
+
+                int tempFaceEndIndex = faceEndIndex - breaklineLength; //Remove the breakline as well
+
+                string faceContent = data.Substring(faceStartIndex, tempFaceEndIndex - faceStartIndex);
+
+                Face newFace = new Face();
+                success = newFace.DeserializeEMAP(this, faceContent, breaklineLength);
+
+                //Exit out if a brush couldn't be parsed properly
+                if (success == false)
+                    return false;
+
+                m_Faces.Add(newFace);
+
+                faceStartIndex = faceEndIndex; //Use this for the next iteration
+            }
+
+            CalculateEdges();
+
+            return true;
+        }
+
+        public string SerializeOBJ(int vertexIndexOffset, int textureCoordinateIndexOffset, int normalIndexOffset)
         {
             //Temp
             StringBuilder stringBuilder = new StringBuilder();
@@ -160,7 +278,18 @@ namespace ProdeusConverter
 
             foreach (Vertex vertex in m_Vertices)
             {
-                stringBuilder.AppendLine("v " + vertex.ToString());
+                //Add offset if needed
+                if (m_Position != null && m_Position.IsNull() == false)
+                {
+                    Vertex tempVertex = new Vertex(vertex);
+                    tempVertex.AddVector3f(m_Position);
+
+                    stringBuilder.AppendLine("v " + tempVertex.ToString());
+                }
+                else
+                {
+                    stringBuilder.AppendLine("v " + vertex.ToString());
+                }
             }
 
             foreach (TextureCoordinate textureCoordinate in m_TextureCoordinates)
@@ -175,7 +304,7 @@ namespace ProdeusConverter
 
             foreach (Face face in m_Faces)
             {
-                stringBuilder.AppendLine(face.SerializeOBJ());
+                stringBuilder.AppendLine(face.SerializeOBJ(vertexIndexOffset, textureCoordinateIndexOffset, normalIndexOffset));
             }
 
             return stringBuilder.ToString();
@@ -189,7 +318,15 @@ namespace ProdeusConverter
             stringBuilder.AppendLine("Brush{");
             stringBuilder.AppendLine("parent=-1");
             stringBuilder.AppendLine("layer=-1");
-            stringBuilder.AppendLine("pos=0,0,0"); //Always place at the origin for now
+
+            if (m_Position == null || m_Position.IsNull())
+            {
+                stringBuilder.AppendLine("pos=0,0,0");
+            }
+            else
+            {
+                stringBuilder.AppendLine("pos=" + m_Position.Serialize(','));
+            }
 
             //Vertices
             StringBuilder pointStringBuilder = new StringBuilder("points=");
@@ -223,7 +360,7 @@ namespace ProdeusConverter
         //Overrides
         public override string ToString()
         {
-            return SerializeOBJ();
+            return SerializeOBJ(0, 0, 0);
         }
     }
 }

@@ -1,4 +1,5 @@
-﻿using System.Globalization;
+﻿using System;
+using System.Globalization;
 using System.Text;
 
 namespace ProdeusConverter
@@ -57,17 +58,44 @@ namespace ProdeusConverter
             m_Y = y;
         }
 
+        public Vector2f(Vector2f otherVector)
+        {
+            //Copy constructor
+            m_X = otherVector.X;
+            m_Y = otherVector.Y;
+        }
+
         ~Vector2f()
         {
             m_X = null;
             m_Y = null;
         }
 
+        //Mutators & Accessors
+        public void AddVector2f(Vector2f otherVector)
+        {
+            if (otherVector.X != null)
+            {
+                if (m_X == null) { m_X = otherVector.X; }
+                else             { m_X += otherVector.X; }
+            }
+
+            if (otherVector.Y != null)
+            {
+                if (m_Y == null) { m_Y = otherVector.Y; }
+                else             { m_Y += otherVector.Y; }
+            }
+        }
+
+        public bool IsNull()
+        {
+            return (m_X == null && m_Y == null);
+        }
 
         //Serialization
-        public bool Deserialize(string data)
+        public bool Deserialize(string data, char separator = ' ')
         {
-            string[] subStrings = data.Split(' ');
+            string[] subStrings = data.Split(separator);
 
             if (subStrings.Length == 0 || subStrings.Length > 2)
             {
@@ -128,6 +156,28 @@ namespace ProdeusConverter
         public override string ToString()
         {
             return Serialize();
+        }
+
+        //https://docs.microsoft.com/en-us/dotnet/api/system.object.equals?view=net-5.0
+        public override bool Equals(Object obj)
+        {
+            //Check for null and compare run-time types.
+            if ((obj == null) || !this.GetType().Equals(obj.GetType()))
+            {
+                return false;
+            }
+            else
+            {
+                Vector2f otherVector = (Vector2f)obj;
+
+                return (m_X == otherVector.X && m_Y == otherVector.Y);
+            }
+        }
+
+        public override int GetHashCode()
+        {
+            //Super bad default hash, but I don't need it for this project
+            return (int)(m_X + m_Y);
         }
     }
 
@@ -198,6 +248,14 @@ namespace ProdeusConverter
             m_Z = z;
         }
 
+        public Vector3f(Vector3f otherVector)
+        {
+            //Copy constructor
+            m_X = otherVector.X;
+            m_Y = otherVector.Y;
+            m_Z = otherVector.Z;
+        }
+
         ~Vector3f()
         {
             m_X = null;
@@ -205,10 +263,52 @@ namespace ProdeusConverter
             m_Z = null;
         }
 
-        //Serialization
-        public bool Deserialize(string data)
+        //Mutators & Accessors
+        public void AddVector2f(Vector2f otherVector)
         {
-            string[] subStrings = data.Split(' ');
+            if (otherVector.X != null)
+            {
+                if (m_X == null) { m_X = otherVector.X; }
+                else             { m_X += otherVector.X; }
+            }
+
+            if (otherVector.Y != null)
+            {
+                if (m_Y == null) { m_Y = otherVector.Y; }
+                else             { m_Y += otherVector.Y; }
+            }
+        }
+
+        public void AddVector3f(Vector3f otherVector)
+        {
+            if (otherVector.X != null)
+            {
+                if (m_X == null) { m_X = otherVector.X; }
+                else             { m_X += otherVector.X; }
+            }
+
+            if (otherVector.Y != null)
+            {
+                if (m_Y == null) { m_Y = otherVector.Y; }
+                else             { m_Y += otherVector.Y; }
+            }
+
+            if (otherVector.Z != null)
+            {
+                if (m_Z == null) { m_Z = otherVector.Z; }
+                else             { m_Z += otherVector.Z; }
+            }
+        }
+
+        public bool IsNull()
+        {
+            return (m_X == null && m_Y == null && m_Z == null);
+        }
+
+        //Serialization
+        public bool Deserialize(string data, char separator = ' ')
+        {
+            string[] subStrings = data.Split(separator);
 
             if (subStrings.Length == 0 || subStrings.Length > 3)
             {
@@ -277,6 +377,28 @@ namespace ProdeusConverter
         public override string ToString()
         {
             return Serialize();
+        }
+
+        //https://docs.microsoft.com/en-us/dotnet/api/system.object.equals?view=net-5.0
+        public override bool Equals(Object obj)
+        {
+            //Check for null and compare run-time types.
+            if ((obj == null) || !this.GetType().Equals(obj.GetType()))
+            {
+                return false;
+            }
+            else
+            {
+                Vector3f otherVector = (Vector3f)obj;
+
+                return (m_X == otherVector.X && m_Y == otherVector.Y && m_Z == otherVector.Z);
+            }
+        }
+
+        public override int GetHashCode()
+        {
+            //Super bad default hash, but I don't need it for this project
+            return (int)(m_X + m_Y + m_Z);
         }
     }
 
@@ -351,15 +473,13 @@ namespace ProdeusConverter
             m_W = w;
         }
 
-        public Vector4f(string data)
+        public Vector4f(Vector4f otherVector)
         {
-            m_X = null;
-            m_Y = null;
-            m_Z = null;
-            m_W = null;
-
-            //Shortcut
-            Deserialize(data);
+            //Copy constructor
+            m_X = otherVector.X;
+            m_Y = otherVector.Y;
+            m_Z = otherVector.Z;
+            m_W = otherVector.W;
         }
 
         ~Vector4f()
@@ -370,10 +490,79 @@ namespace ProdeusConverter
             m_W = null;
         }
 
-        //Serialization
-        public bool Deserialize(string data)
+        //Mutators & Accessors
+        public void AddVector2f(Vector2f otherVector)
         {
-            string[] subStrings = data.Split(' ');
+            if (otherVector.X != null)
+            {
+                if (m_X == null) { m_X = otherVector.X; }
+                else             { m_X += otherVector.X; }
+            }
+
+            if (otherVector.Y != null)
+            {
+                if (m_Y == null) { m_Y = otherVector.Y; }
+                else             { m_Y += otherVector.Y; }
+            }
+        }
+
+        public void AddVector3f(Vector3f otherVector)
+        {
+            if (otherVector.X != null)
+            {
+                if (m_X == null) { m_X = otherVector.X; }
+                else             { m_X += otherVector.X; }
+            }
+
+            if (otherVector.Y != null)
+            {
+                if (m_Y == null) { m_Y = otherVector.Y; }
+                else             { m_Y += otherVector.Y; }
+            }
+
+            if (otherVector.Z != null)
+            {
+                if (m_Z == null) { m_Z = otherVector.Z; }
+                else             { m_Z += otherVector.Z; }
+            }
+        }
+
+        public void AddVector4f(Vector4f otherVector)
+        {
+            if (otherVector.X != null)
+            {
+                if (m_X == null) { m_X = otherVector.X; }
+                else             { m_X += otherVector.X; }
+            }
+
+            if (otherVector.Y != null)
+            {
+                if (m_Y == null) { m_Y = otherVector.Y; }
+                else             { m_Y += otherVector.Y; }
+            }
+
+            if (otherVector.Z != null)
+            {
+                if (m_Z == null) { m_Z = otherVector.Z; }
+                else             { m_Z += otherVector.Z; }
+            }
+
+            if (otherVector.W != null)
+            {
+                if (m_W == null) { m_W = otherVector.W; }
+                else             { m_W += otherVector.W; }
+            }
+        }
+
+        public bool IsNull()
+        {
+            return (m_X == null && m_Y == null && m_Z == null && m_W == null);
+        }
+
+        //Serialization
+        public bool Deserialize(string data, char separator = ' ')
+        {
+            string[] subStrings = data.Split(separator);
 
             if (subStrings.Length == 0 || subStrings.Length > 4)
             {
@@ -449,6 +638,28 @@ namespace ProdeusConverter
         public override string ToString()
         {
             return Serialize();
+        }
+
+        //https://docs.microsoft.com/en-us/dotnet/api/system.object.equals?view=net-5.0
+        public override bool Equals(Object obj)
+        {
+            //Check for null and compare run-time types.
+            if ((obj == null) || !this.GetType().Equals(obj.GetType()))
+            {
+                return false;
+            }
+            else
+            {
+                Vector4f otherVector = (Vector4f)obj;
+
+                return (m_X == otherVector.X && m_Y == otherVector.Y && m_Z == otherVector.Z && m_W == otherVector.W);
+            }
+        }
+
+        public override int GetHashCode()
+        {
+            //Super bad default hash, but I don't need it for this project
+            return (int)(m_X + m_Y + m_Z + m_W);
         }
     }
 }

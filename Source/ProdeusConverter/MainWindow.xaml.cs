@@ -46,8 +46,9 @@ namespace ProdeusConverter
             //https://docs.microsoft.com/en-us/dotnet/api/system.windows.forms.openfiledialog?view=net-5.0
 
             OpenFileDialog openFileDialog = new OpenFileDialog();
-            openFileDialog.Filter = "obj files (*.obj)|*.obj|All files (*.*)|*.*";
+            openFileDialog.Filter = "Prodeus map (*.emap)|*.emap|obj files (*.obj)|*.obj|All files (*.*)|*.*";
             openFileDialog.RestoreDirectory = true;
+            openFileDialog.FilterIndex = 2;
 
             if (openFileDialog.ShowDialog() == true)
             {
@@ -60,8 +61,9 @@ namespace ProdeusConverter
             //https://docs.microsoft.com/en-us/dotnet/api/system.windows.forms.savefiledialog?view=net-5.0
 
             SaveFileDialog saveFileDialog = new SaveFileDialog();
-            saveFileDialog.Filter = "Prodeus map (*.emap)|*.emap|All files (*.*)|*.*";
+            saveFileDialog.Filter = "Prodeus map (*.emap)|*.emap|obj files (*.obj)|*.obj|All files (*.*)|*.*";
             saveFileDialog.RestoreDirectory = true;
+            saveFileDialog.FilterIndex = 1;
 
             if (saveFileDialog.ShowDialog() == true)
             {
@@ -98,14 +100,14 @@ namespace ProdeusConverter
             }
 
             //--------------------
-            // Deserialize OBJ
+            // Deserialize
             //--------------------
             Model model = new Model();
 
             try
             {
                 Logger.LogMessage(Logger.LogType.Normal, "Reading input file...");
-                bool success = model.DeserializeOBJ(inputFilePath);
+                bool success = model.Deserialize(inputFilePath);
 
                 if (success == false)
                 {
@@ -129,7 +131,13 @@ namespace ProdeusConverter
                 SerializeMode serializeMode = SerializeMode.Append;
                 if (OverwriteRadioButton.IsChecked == true) serializeMode = SerializeMode.Overwrite;
 
-                model.SerializeEMAP(outputFilePath, serializeMode);
+                bool success = model.Serialize(outputFilePath, serializeMode);
+
+                if (success == false)
+                {
+                    Logger.LogMessage(Logger.LogType.Error, "Error writing output file");
+                    return;
+                }
             }
             catch (Exception exception)
             {
